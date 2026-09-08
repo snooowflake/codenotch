@@ -213,7 +213,7 @@ enum FetchErr {
 }
 
 fn fetch_once(token: &str) -> Result<Vec<LimitWindow>, FetchErr> {
-    let resp = ureq::get(ENDPOINT)
+    let resp = ureq::AgentBuilder::new().redirects(0).build().get(ENDPOINT)
         .set("Authorization", &format!("Bearer {token}"))
         .set("anthropic-beta", "oauth-2025-04-20")
         .timeout(Duration::from_secs(15))

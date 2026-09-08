@@ -1,0 +1,51 @@
+name: Windows portable build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [windows-build]
+    paths:
+      - 'windows/**'
+      - '.github/workflows/windows-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: windows
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Select Rust MSVC toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup default stable-x86_64-pc-windows-msvc
+      - name: Test
+        run: cargo test --locked -p codenotch
+      - name: Build release
+        run: cargo build --locked --release -p codenotch
+      - name: Package portable executable
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item target/release/codenotch.exe dist/
+          Copy-Item ../LICENSE,README.md dist/
+          Copy-Item Setup-DeepSeek.ps1 dist/
+          git rev-parse HEAD | Set-Content dist/SOURCE-COMMIT.txt
+          cargo tree --locked -p codenotch --target x86_64-pc-windows-msvc | Set-Content dist/DEPENDENCIES.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Select-String -Path dist/DEPENDENCIES.txt -Pattern '\bglib v0\.18\.5\b' -Quiet) { throw 'Vulnerable GLib unexpectedly included in Windows dependency tree' }
+          Get-FileHash dist/*.exe -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $([IO.Path]::GetFileName($_.Path))" } | Set-Content dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: codenotch-windows-x64
+          path: windows/dist/
+          if-no-files-found: error
+          retention-days: 14

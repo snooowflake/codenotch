@@ -187,7 +187,7 @@ fn local_agent() -> Option<ureq::Agent> {
         .danger_accept_invalid_hostnames(true)
         .build()
         .ok()?;
-    Some(ureq::AgentBuilder::new().tls_connector(Arc::new(tls)).timeout(Duration::from_secs(10)).build())
+    Some(ureq::AgentBuilder::new().redirects(0).tls_connector(Arc::new(tls)).timeout(Duration::from_secs(10)).build())
 }
 
 fn bridge_quota(ep: &Endpoint) -> Result<Vec<LimitWindow>, String> {
@@ -341,7 +341,7 @@ fn read_credentials() -> Option<Creds> {
 
 /// Tier name ("Personal"/"Pro"…); 401/403 → NeedsAuth
 fn load_tier(token: &str) -> Result<String, String> {
-    let agent = ureq::AgentBuilder::new().timeout(Duration::from_secs(15)).build();
+    let agent = ureq::AgentBuilder::new().redirects(0).timeout(Duration::from_secs(15)).build();
     match agent
         .post(LOAD_CODE_ASSIST)
         .set("Authorization", &format!("Bearer {token}"))
@@ -370,7 +370,7 @@ fn load_tier(token: &str) -> Result<String, String> {
 
 /// Direct quota for licensed accounts; a personal account gets 403 → None (not an error)
 fn direct_quota(token: &str) -> Option<Vec<LimitWindow>> {
-    let agent = ureq::AgentBuilder::new().timeout(Duration::from_secs(15)).build();
+    let agent = ureq::AgentBuilder::new().redirects(0).timeout(Duration::from_secs(15)).build();
     let r = agent
         .post(QUOTA_SUMMARY)
         .set("Authorization", &format!("Bearer {token}"))

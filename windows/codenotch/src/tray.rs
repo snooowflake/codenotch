@@ -23,8 +23,6 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
 }
 
 pub fn build_menu(app: &AppHandle, lang: &str) -> tauri::Result<Menu<Wry>> {
-    let install = MenuItemBuilder::with_id("install", tr(lang, "install")).build(app)?;
-    let uninstall = MenuItemBuilder::with_id("uninstall", tr(lang, "uninstall")).build(app)?;
     let l_auto = CheckMenuItemBuilder::with_id("lang-auto", tr(lang, "lang_auto"))
         .checked(lang == "auto")
         .build(app)?;
@@ -51,8 +49,6 @@ pub fn build_menu(app: &AppHandle, lang: &str) -> tauri::Result<Menu<Wry>> {
         .build(app)?;
     let quit = MenuItemBuilder::with_id("quit", tr(lang, "quit")).build(app)?;
     MenuBuilder::new(app)
-        .items(&[&install, &uninstall])
-        .separator()
         .item(&lang_menu)
         .item(&refresh)
         .item(&reset)
@@ -78,7 +74,7 @@ fn refresh_menu(app: &AppHandle) {
 
 fn handle(app: &AppHandle, id: &str) {
     match id {
-        "install" => notice(app, hooks_install::install()),
+        "install" => notice(app, Err("Claude hooks disabled in this privacy build".into())),
         "uninstall" => notice(app, hooks_install::uninstall()),
         "reset" => crate::reset_bar(app),
         "open-data" => {

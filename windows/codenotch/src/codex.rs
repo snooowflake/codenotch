@@ -178,7 +178,7 @@ enum LiveErr {
 }
 
 fn fetch_usage(cred: &Credential) -> Result<serde_json::Value, LiveErr> {
-    let resp = ureq::get(ENDPOINT)
+    let resp = ureq::AgentBuilder::new().redirects(0).build().get(ENDPOINT)
         .set("Authorization", &format!("Bearer {}", cred.access_token))
         .set("ChatGPT-Account-Id", &cred.account_id)
         .set("Accept", "application/json")
@@ -188,16 +188,8 @@ fn fetch_usage(cred: &Credential) -> Result<serde_json::Value, LiveErr> {
         .call();
     match resp {
         Ok(r) => r.into_json().map_err(|e| LiveErr::Other(format!("parse: {e}"))),
-        Err(ureq::Error::Status(code @ (401 | 403), r)) => {
-            // 401 is about the token; 403 can also be an edge node rejecting the user agent — record the status and the start of the body rather than folding both into "please sign in"
-            let head: String = r
-                .into_string()
-                .unwrap_or_default()
-                .chars()
-                .filter(|c| !c.is_control())
-                .take(160)
-                .collect();
-            crate::applog(&format!("codex: usage endpoint HTTP {code}: {head}"));
+        Err(ureq::Error::Status(code @ (401 | 403), _)) => {
+            crate::applog(&format!("codex: usage endpoint HTTP {code}"));
             Err(LiveErr::NeedsAuth)
         }
         Err(ureq::Error::Status(429, r)) => {

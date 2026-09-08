@@ -15,7 +15,7 @@ mod cursor;
 mod antigravity;
 mod glyphs;
 mod activity;
-mod diag;
+mod deepseek;
 mod watcher;
 
 use std::sync::Mutex;
@@ -28,6 +28,7 @@ pub const BUILD: &str = "r31";
 pub const NOTCH_H: f64 = 460.0; // 300 clipped the card once it held three window blocks plus the session list
 
 pub struct AppState {
+    pub deepseek: Mutex<deepseek::Balance>,
     pub store: Mutex<state::Store>,
     pub cfg: Mutex<config::Config>,
     pub usage: Mutex<usage::UsageSnapshot>,
@@ -314,6 +315,7 @@ fn get_codex(state: tauri::State<AppState>) -> usage::UsageSnapshot {
 fn open_provider_page(provider: String) {
     let url = match provider.as_str() {
         "codex" => "https://chatgpt.com/#settings/Account",
+        "deepseek" => "https://platform.deepseek.com/usage",
         "cursor" => "https://cursor.com/dashboard",
         "gemini" => "https://antigravity.google",
         _ => "https://claude.ai/settings/usage",
@@ -550,13 +552,18 @@ fn report(r: Result<String, String>) {
     let _ = std::fs::write(log, &msg);
 }
 
+#[tauri::command]
+fn get_deepseek(state: tauri::State<AppState>) -> deepseek::Balance {
+    state.deepseek.lock().unwrap().clone()
+}
+
 fn main() {
     attach_console();
     let args: Vec<String> = std::env::args().collect();
     if let Some(cmd) = args.get(1) {
         match cmd.as_str() {
             "install-hooks" => {
-                report(hooks_install::install());
+                report(Err("Claude hooks disabled in this privacy build".into()));
                 return;
             }
             "uninstall-hooks" => {
@@ -573,7 +580,7 @@ fn main() {
                 return;
             }
             "doctor" => {
-                let out = if args.get(2).map(|s| s.as_str()) == Some("deep") { diag::run() } else { doctor::run() };
+                let out = if args.get(2).map(|s| s.as_str()) == Some("deep") { String::from("Deep diagnostics disabled: they may expose private values.") } else { doctor::run() };
                 println!("{out}");
                 let log = config::config_path().with_file_name("doctor.log");
                 let _ = std::fs::write(log, &out);
@@ -584,7 +591,7 @@ fn main() {
     }
 
     let cfg = config::load();
-    let port = cfg.port;
+
 
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -594,16 +601,18 @@ fn main() {
             let _ = app.emit("notice", format!("Codenotch is already running ({BUILD}) — quit it from the tray before starting a new build"));
         }))
         .manage(AppState {
+            deepseek: Mutex::new(deepseek::Balance::default()),
             store: Mutex::new(Default::default()),
             cfg: Mutex::new(cfg),
-            usage: Mutex::new(usage::load_persisted()),
+            usage: Mutex::new(usage::UsageSnapshot { status: "absent".into(), ..Default::default() }),
             codex: Mutex::new(codex::load_persisted()),
-            cursor: Mutex::new(cursor::load_persisted()),
-            antigravity: Mutex::new(antigravity::load_persisted()),
+            cursor: Mutex::new(usage::UsageSnapshot { status: "absent".into(), ..Default::default() }),
+            antigravity: Mutex::new(usage::UsageSnapshot { status: "absent".into(), ..Default::default() }),
             glyphs: Mutex::new(Default::default()),
             activity: Mutex::new(Vec::new()),
         })
         .invoke_handler(tauri::generate_handler![
+            get_deepseek,
             get_state,
             get_usage,
             get_codex,
@@ -631,13 +640,8 @@ fn main() {
                 let _ = w.show();
             }
             tray::setup(&handle)?;
-            server::start(handle.clone(), port);
-            watcher::start(handle.clone());
-            usage::start(handle.clone());
             codex::start(handle.clone());
-            cursor::start(handle.clone());
-            antigravity::start(handle.clone());
-            activity::start(handle.clone());
+            deepseek::start(handle.clone());
             // Collecting glyphs may read icon resources out of a few executables; do it off the main thread and push when done
             let gh = handle.clone();
             std::thread::spawn(move || reload_glyphs(&gh));
