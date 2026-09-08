@@ -464,6 +464,7 @@ struct Runtime {
 }
 
 fn read_once(rt: &mut Runtime, prev: &UsageSnapshot) -> UsageSnapshot {
+    if !crate::accounts::enabled("gemini") { return crate::accounts::hidden(); }
     let mut snap = UsageSnapshot::default();
     // 1. Local bridge (the cached endpoint first; the port changes on every launch, so a miss is normal)
     let mut bridge_err = String::new();
@@ -556,9 +557,14 @@ fn read_once(rt: &mut Runtime, prev: &UsageSnapshot) -> UsageSnapshot {
     snap
 }
 
-fn broadcast(app: &AppHandle, snap: UsageSnapshot) {
+fn broadcast(app: &AppHandle, mut snap: UsageSnapshot) {
     let st = app.state::<AppState>();
-    *st.antigravity.lock().unwrap() = snap.clone();
+    let mut current = st.antigravity.lock().unwrap();
+    if !crate::accounts::enabled("gemini") {
+        let hold = snap.backoff_until.max(current.backoff_until);
+        snap = crate::accounts::hidden(); snap.backoff_until = hold;
+    }
+    *current = snap.clone();
     persist(&snap);
     let _ = app.emit("antigravity", &snap);
 }

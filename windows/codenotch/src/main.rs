@@ -16,6 +16,8 @@ mod antigravity;
 mod glyphs;
 mod activity;
 mod deepseek;
+mod accounts;
+mod vault;
 mod watcher;
 
 use std::sync::Mutex;
@@ -24,8 +26,8 @@ use tauri::{AppHandle, Emitter, Manager};
 /// Logical size of the notch window: the 70 pt pill column on the right plus room for the hover card on the left.
 pub const NOTCH_W: f64 = 340.0;
 /// Hand-bumped build tag, written to run.log at startup so a log can always be matched to the exe that wrote it.
-pub const BUILD: &str = "r31";
-pub const NOTCH_H: f64 = 460.0; // 300 clipped the card once it held three window blocks plus the session list
+pub const BUILD: &str = "connections-0.4.0";
+pub const NOTCH_H: f64 = 620.0; // 300 clipped the card once it held three window blocks plus the session list
 
 pub struct AppState {
     pub deepseek: Mutex<deepseek::Balance>,
@@ -252,11 +254,7 @@ fn get_usage(state: tauri::State<AppState>) -> usage::UsageSnapshot {
 
 #[tauri::command]
 fn refresh_usage(app: AppHandle) {
-    {
-        let st = app.state::<AppState>();
-        let mut u = st.usage.lock().unwrap();
-        u.backoff_until = 0;
-    }
+    deepseek::request_refresh();
     usage::request_refresh();
     codex::request_refresh();
     cursor::request_refresh();
@@ -591,9 +589,19 @@ fn main() {
     }
 
     let cfg = config::load();
+    accounts::initialize(&cfg.disabled_providers);
 
 
     tauri::Builder::default()
+        .on_window_event(|window, event| {
+            if window.label() == "settings" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = window.emit("settings-hidden", ());
+                    let _ = window.hide();
+                }
+            }
+        })
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             // Launching a freshly built exe while the old one is still running lands here: the new
             // instance is turned away and what stays on screen is the old process. Say so loudly.
@@ -604,14 +612,21 @@ fn main() {
             deepseek: Mutex::new(deepseek::Balance::default()),
             store: Mutex::new(Default::default()),
             cfg: Mutex::new(cfg),
-            usage: Mutex::new(usage::UsageSnapshot { status: "absent".into(), ..Default::default() }),
-            codex: Mutex::new(codex::load_persisted()),
-            cursor: Mutex::new(usage::UsageSnapshot { status: "absent".into(), ..Default::default() }),
-            antigravity: Mutex::new(usage::UsageSnapshot { status: "absent".into(), ..Default::default() }),
+            usage: Mutex::new(if accounts::enabled("claude") { usage::load_persisted() } else { accounts::hidden() }),
+            codex: Mutex::new(if accounts::enabled("codex") { codex::load_persisted() } else { accounts::hidden() }),
+            cursor: Mutex::new(if accounts::enabled("cursor") { cursor::load_persisted() } else { accounts::hidden() }),
+            antigravity: Mutex::new(if accounts::enabled("gemini") { antigravity::load_persisted() } else { accounts::hidden() }),
             glyphs: Mutex::new(Default::default()),
             activity: Mutex::new(Vec::new()),
         })
         .invoke_handler(tauri::generate_handler![
+            accounts::open_settings,
+            accounts::close_settings,
+            accounts::get_accounts,
+            accounts::set_provider_enabled,
+            accounts::refresh_accounts,
+            accounts::save_deepseek_key,
+            accounts::forget_deepseek_key,
             get_deepseek,
             get_state,
             get_usage,
@@ -640,6 +655,9 @@ fn main() {
                 let _ = w.show();
             }
             tray::setup(&handle)?;
+            usage::start(handle.clone());
+            cursor::start(handle.clone());
+            antigravity::start(handle.clone());
             codex::start(handle.clone());
             deepseek::start(handle.clone());
             // Collecting glyphs may read icon resources out of a few executables; do it off the main thread and push when done

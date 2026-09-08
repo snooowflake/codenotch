@@ -41,6 +41,7 @@ pub fn build_menu(app: &AppHandle, lang: &str) -> tauri::Result<Menu<Wry>> {
     let lang_menu = SubmenuBuilder::new(app, tr(lang, "language"))
         .items(&[&l_auto, &l_zh, &l_en, &l_ja, &l_ko])
         .build()?;
+    let connections = MenuItemBuilder::with_id("connections", "Connexions…").build(app)?;
     let refresh = MenuItemBuilder::with_id("refresh", tr(lang, "refresh")).build(app)?;
     let reset = MenuItemBuilder::with_id("reset", tr(lang, "reset_pos")).build(app)?;
     let open_data = MenuItemBuilder::with_id("open-data", tr(lang, "open_data")).build(app)?;
@@ -49,6 +50,7 @@ pub fn build_menu(app: &AppHandle, lang: &str) -> tauri::Result<Menu<Wry>> {
         .build(app)?;
     let quit = MenuItemBuilder::with_id("quit", tr(lang, "quit")).build(app)?;
     MenuBuilder::new(app)
+        .item(&connections)
         .item(&lang_menu)
         .item(&refresh)
         .item(&reset)
@@ -74,6 +76,7 @@ fn refresh_menu(app: &AppHandle) {
 
 fn handle(app: &AppHandle, id: &str) {
     match id {
+        "connections" => { let _ = crate::accounts::open_settings(app.clone()); },
         "install" => notice(app, Err("Claude hooks disabled in this privacy build".into())),
         "uninstall" => notice(app, hooks_install::uninstall()),
         "reset" => crate::reset_bar(app),
@@ -90,11 +93,7 @@ fn handle(app: &AppHandle, id: &str) {
             let _ = cmd.spawn();
         }
         "refresh" => {
-            {
-                let st = app.state::<crate::AppState>();
-                let mut u = st.usage.lock().unwrap();
-                u.backoff_until = 0;
-            }
+            crate::deepseek::request_refresh();
             crate::usage::request_refresh();
             crate::codex::request_refresh();
             crate::cursor::request_refresh();

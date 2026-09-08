@@ -247,11 +247,10 @@ fn backoff_secs(consecutive: u32, retry_after_floor: u64) -> u64 {
 
 fn set_and_broadcast(app: &AppHandle, mutate: impl FnOnce(&mut UsageSnapshot)) {
     let st = app.state::<AppState>();
-    let snap = {
-        let mut u = st.usage.lock().unwrap();
-        mutate(&mut u);
-        u.clone()
-    };
+    let mut u = st.usage.lock().unwrap();
+    mutate(&mut u);
+    if !crate::accounts::enabled("claude") { let hold = u.backoff_until; *u = crate::accounts::hidden(); u.backoff_until = hold; }
+    let snap = u.clone();
     persist(&snap);
     let _ = app.emit("usage", &snap);
 }
@@ -266,6 +265,11 @@ pub fn start(app: AppHandle) {
         }
         let mut consecutive_429: u32 = 0;
         loop {
+            if !crate::accounts::enabled("claude") {
+                set_and_broadcast(&app, |_| {});
+                sleep_interruptible(2);
+                continue;
+            }
             // No requests inside the backoff window
             let bu = {
                 let st = app.state::<AppState>();

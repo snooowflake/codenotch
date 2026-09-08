@@ -218,6 +218,7 @@ fn cap(s: &str) -> String {
 }
 
 fn read_once(prev: &UsageSnapshot) -> UsageSnapshot {
+    if !crate::accounts::enabled("cursor") { return crate::accounts::hidden(); }
     let mut snap = prev.clone();
     let Some(creds) = read_credentials() else {
         snap.status = "needsAuth".into();
@@ -255,9 +256,14 @@ fn read_once(prev: &UsageSnapshot) -> UsageSnapshot {
     snap
 }
 
-fn broadcast(app: &AppHandle, snap: UsageSnapshot) {
+fn broadcast(app: &AppHandle, mut snap: UsageSnapshot) {
     let st = app.state::<AppState>();
-    *st.cursor.lock().unwrap() = snap.clone();
+    let mut current = st.cursor.lock().unwrap();
+    if !crate::accounts::enabled("cursor") {
+        let hold = snap.backoff_until.max(current.backoff_until);
+        snap = crate::accounts::hidden(); snap.backoff_until = hold;
+    }
+    *current = snap.clone();
     persist(&snap);
     let _ = app.emit("cursor", &snap);
 }

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Codenotch — Connexions</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#111317;color:#f3f5f7;font:14px/1.5 "Segoe UI",sans-serif}
+header{padding:24px 26px 18px;border-bottom:1px solid #2a2e35;background:#15181d}
+.eyebrow{color:#7de3b3;font-size:11px;letter-spacing:2px;font-weight:700}h1{margin:5px 0;font-size:25px}p{margin:6px 0;color:#b9c0ca}
+main{padding:18px 24px 26px}article{border:1px solid #343a43;border-radius:14px;padding:16px;margin-bottom:12px;background:#191d23}
+.row{display:flex;align-items:center;gap:10px}.row h2{font-size:16px;margin:0;flex:1}.mark{width:30px;height:30px;border-radius:9px;background:#2b343f;display:grid;place-items:center;color:#b5e9d2;font-weight:700}
+.switch{display:flex;gap:6px;align-items:center;font-size:12px;cursor:pointer}.switch input{accent-color:#66dba6;width:17px;height:17px}
+.state{font-size:12px;color:#a2aebc;margin:9px 0}.state.ok{color:#78e3af}.state.error{color:#ffb38b}
+.help{font-size:12px;color:#aeb6c3;line-height:1.6}code{display:inline-block;background:#101216;color:#d2dfec;padding:1px 6px;border-radius:4px;user-select:text}
+button{border:1px solid #4c5665;border-radius:8px;background:#262d37;color:#edf2f8;padding:8px 12px;font:inherit;cursor:pointer}button:hover{background:#354153}button:disabled{opacity:.5;cursor:wait}button:focus-visible,input:focus-visible{outline:2px solid #7de3b3;outline-offset:2px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.primary{background:#75dbae;color:#102319;border-color:#75dbae;font-weight:600}.primary:hover{background:#98efc7}.danger{color:#ffc1b3}.field{display:block;margin-top:12px;font-size:12px}
+input[type=password]{width:100%;margin-top:5px;border:1px solid #536073;background:#101419;color:#f4f7fa;border-radius:8px;padding:10px;font:15px "Segoe UI",sans-serif}
+#feedback{min-height:24px;color:#9be5c1;font-size:13px;margin-bottom:10px;overflow-wrap:anywhere}
+footer{font-size:12px;color:#929daa;padding-top:8px}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}.toolbar span{color:#aeb6c3;font-size:12px}
+.stored{font-size:12px;color:#a6bfaf;margin-top:5px}details{margin-top:9px;font-size:12px;color:#b3bdc9}summary{cursor:pointer}details p{margin-top:8px}
+</style></head>
+<body>
+<header><div class="eyebrow">CODENOTCH · WINDOWS</div><h1>Connexions</h1><p>Vos comptes et votre solde, au même endroit.</p></header>
+<main>
+<div class="toolbar"><span>Les réglages sont enregistrés sur ce PC.</span><button id="refresh" type="button">Actualiser</button></div>
+<div id="feedback" role="status" aria-live="polite"></div>
+<article data-provider="codex">
+ <div class="row"><span class="mark">Cx</span><h2>GPT / Codex</h2><label class="switch"><input type="checkbox" data-toggle="codex" aria-label="Activer Codex">Activé</label></div>
+ <div class="state" data-status="codex">Vérification…</div><p class="help">Utilise la session ChatGPT de Codex sur ce PC. Connectez-vous dans l’application Codex, ou lancez <code>codex login</code>, puis actualisez.</p>
+ <details><summary>Et une clé API OpenAI ?</summary><p>Une clé API OpenAI ne donne pas accès aux quotas de votre abonnement ChatGPT. Ce panneau affiche les limites de la session Codex ; aucune clé OpenAI n’est nécessaire.</p></details>
+ <div class="actions"><button data-page="codex" type="button">Page du compte</button></div>
+</article>
+<article data-provider="claude">
+ <div class="row"><span class="mark">C</span><h2>Claude Code</h2><label class="switch"><input type="checkbox" data-toggle="claude" aria-label="Activer Claude Code">Activé</label></div>
+ <div class="state" data-status="claude">Vérification…</div><p class="help">Connectez-vous dans Claude Code avec <code>/login</code>, puis actualisez. La session locale est utilisée en lecture seule.</p>
+ <details><summary>Clés API et codes de connexion</summary><p>La clé API Anthropic et les jetons limités à l’inférence ne permettent pas de lire ces quotas d’abonnement. Saisissez les codes de connexion dans le parcours officiel de Claude Code.</p></details>
+ <div class="actions"><button data-page="claude" type="button">Page du compte</button></div>
+</article>
+<article data-provider="cursor">
+ <div class="row"><span class="mark">Cu</span><h2>Cursor</h2><label class="switch"><input type="checkbox" data-toggle="cursor" aria-label="Activer Cursor">Activé</label></div>
+ <div class="state" data-status="cursor">Vérification…</div><p class="help">Connectez-vous dans l’éditeur Cursor sur ce PC. Codenotch retrouve sa session locale ; aucune clé administrateur n’est demandée.</p>
+ <div class="actions"><button data-page="cursor" type="button">Page du compte</button></div>
+</article>
+<article data-provider="gemini">
+ <div class="row"><span class="mark">Ag</span><h2>Antigravity</h2><label class="switch"><input type="checkbox" data-toggle="gemini" aria-label="Activer Antigravity">Activé</label></div>
+ <div class="state" data-status="gemini">Vérification…</div><p class="help">Ouvrez Antigravity et connectez votre compte Google, puis actualisez. Une clé Gemini API ne remplace pas la session Antigravity.</p>
+ <div class="actions"><button data-page="gemini" type="button">Page du service</button></div>
+</article>
+<article data-provider="deepseek">
+ <div class="row"><span class="mark">Ds</span><h2>DeepSeek API</h2><label class="switch"><input type="checkbox" data-toggle="deepseek" aria-label="Activer DeepSeek">Activé</label></div>
+ <div class="state" data-status="deepseek">Vérification…</div><p class="help">Affiche le solde officiel de votre compte API. La clé est protégée dans le coffre Windows et utilisée uniquement auprès de DeepSeek.</p>
+ <form id="key-form" autocomplete="off">
+  <label class="field" for="api-key">Clé API DeepSeek</label>
+  <input type="password" id="api-key" name="deepseek-api-key" placeholder="sk-…" autocomplete="new-password" spellcheck="false" maxlength="512">
+  <div id="key-state" class="stored">Aucune clé enregistrée.</div>
+  <div class="actions"><button class="primary" id="save-key" type="submit">Enregistrer la clé</button><button class="danger" id="forget-key" type="button">Oublier la clé</button><button data-page="deepseek" type="button">Page du compte</button></div>
+ </form>
+</article>
+<footer>Désactiver un service arrête ses lectures et masque ses données. Cela ne déconnecte pas l’application d’origine. Vos clés ne sont ni incluses dans le code partagé ni envoyées à GitHub.</footer>
+</main>
+<script>
+const invoke=window.__TAURI__.core.invoke,listen=window.__TAURI__.event.listen;
+const input=document.getElementById('api-key'),feedback=document.getElementById('feedback');
+let busy=false;
+const labels={ok:'Connecté · dernière lecture reçue',stale:'Dernière lecture conservée · actualisation en attente',needsAuth:'Connexion nécessaire',absent:'Session locale non détectée',none:'En attente de données',error:'Service indisponible · réessayez plus tard',backoff:'Limite temporaire · attente du prochain essai',disabled:'Désactivé'};
+function say(text){feedback.textContent=text;}
+async function load(){
+ try{
+  const accounts=await invoke('get_accounts');
+  for(const a of accounts){
+   const check=document.querySelector('[data-toggle="'+a.id+'"]'),state=document.querySelector('[data-status="'+a.id+'"]');
+   if(!check||!state)continue;
+   if(!busy)check.checked=a.enabled;
+   state.textContent=!a.enabled?'Désactivé':labels[a.status]||'Vérification…';
+   state.className='state '+(a.enabled&&a.status==='ok'?'ok':a.status==='error'?'error':'');
+   if(a.id==='deepseek'){
+    document.getElementById('key-state').textContent=a.key_saved?'Une clé est enregistrée. Elle ne sera jamais réaffichée.':'Aucune clé enregistrée.';
+    document.getElementById('forget-key').disabled=!a.key_saved||busy;
+   }
+  }
+ }catch{say('Impossible de lire les connexions. Fermez puis rouvrez ce menu.');}
+}
+document.querySelectorAll('[data-toggle]').forEach(check=>check.addEventListener('change',async()=>{
+ if(busy){check.checked=!check.checked;return;}
+ busy=true;check.disabled=true;
+ try{await invoke('set_provider_enabled',{provider:check.dataset.toggle,on:check.checked});say(check.checked?'Service activé. Lecture en cours…':'Service désactivé.');}
+ catch{check.checked=!check.checked;say('Impossible de modifier ce réglage.');}
+ finally{busy=false;check.disabled=false;load();}
+}));
+document.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>invoke('open_provider_page',{provider:b.dataset.page}).catch(()=>say('Impossible d’ouvrir cette page.'))));
+document.getElementById('key-form').addEventListener('submit',async event=>{
+ event.preventDefault();if(busy)return;
+ const key=input.value.trim();input.value='';
+ if(!/^sk-[A-Za-z0-9_-]{5,509}$/.test(key)){say('Format de clé DeepSeek invalide.');return;}
+ busy=true;document.getElementById('save-key').disabled=true;
+ try{await invoke('save_deepseek_key',{key});say('Clé enregistrée dans le coffre Windows. Vérification du solde en cours…');}
+ catch{say('Impossible d’enregistrer la clé dans le coffre Windows.');}
+ finally{busy=false;document.getElementById('save-key').disabled=false;load();}
+});
+document.getElementById('forget-key').addEventListener('click',async()=>{
+ if(busy)return;
+ if(!window.confirm('Oublier la clé DeepSeek sur ce PC ? Votre compte DeepSeek reste inchangé.'))return;
+ input.value='';busy=true;
+ try{await invoke('forget_deepseek_key');say('Clé supprimée du coffre Windows.');}catch{say('Impossible de supprimer la clé.');}
+ finally{busy=false;load();}
+});
+document.getElementById('refresh').addEventListener('click',async()=>{try{await invoke('refresh_accounts');say('Actualisation demandée. Les délais imposés par les services restent respectés.');load();}catch{say('Actualisation indisponible.');}});
+listen('accounts-changed',load).catch(()=>{});
+listen('settings-hidden',()=>{input.value='';}).catch(()=>{});
+window.addEventListener('pagehide',()=>{input.value='';});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){input.value='';invoke('close_settings').catch(()=>{});}});
+setInterval(load,3000);load();
+</script>
+</body></html>

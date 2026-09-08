@@ -96,17 +96,21 @@
     background:rgba(0,0,0,.85);border-radius:8px;padding:4px 8px;display:none
   }
   #notice.show{display:block}
+  #connections{position:absolute;right:8px;bottom:12px;width:54px;height:34px;border:1px solid #444;border-radius:12px;background:#111;color:#ddd;font-size:20px;cursor:pointer;z-index:10}
+  #connections:focus-visible{outline:2px solid #00ff88}
 </style>
 </head>
 <body>
 <div id="root">
   <div id="card"></div>
   <div id="pill"></div><!-- one .cell per provider, stacked vertically (upstream: data-driven, the same layout for 1–5 cells) -->
+  <button id="connections" type="button" title="Connexions" aria-label="Connexions">⚙</button>
   <div id="notice"></div>
 </div>
 <script>
 const invoke = window.__TAURI__.core.invoke;
 const listen = window.__TAURI__.event.listen;
+document.getElementById('connections').addEventListener('click',()=>invoke('open_settings').catch(e=>notice(String(e))));
 
 /* Colour ramp (upstream palette values) */
 const AMPLE='#00FF88', WATCH='#F2FF00', CRIT='#FF3F00';
@@ -117,7 +121,7 @@ let usage={status:'absent',windows:[],fetched_at:0,note:''};
 let codexSnap={status:'absent',windows:[],fetched_at:0,note:''};
 let cursorSnap={status:'absent',windows:[],fetched_at:0,note:''};
 let agSnap={status:'absent',windows:[],fetched_at:0,note:''};
-let deepseekSnap={status:'needsAuth',note:'Configure the API key locally with Setup-DeepSeek.ps1',fetched_at:0,balances:[]};
+let deepseekSnap={status:'needsAuth',note:'Ouvrez Connexions pour enregistrer votre clé API DeepSeek',fetched_at:0,balances:[]};
 let glyphs={}; // id → {kind:'mark'|'appicon', url}
 let activity=[]; // working state of the non-Claude providers: {provider,state:'busy'|'waiting',name,detail,since}
 // "Is it working?" per provider: Claude from the four-state engine, the others from the activity probe. Returns running | attention | idle
@@ -148,7 +152,7 @@ function providers(){
   if(cursorSnap.status!=='absent') list.push({id:'cursor',name:'Cursor',glyph:'Cu',snap:cursorSnap});
   if(agSnap.status!=='absent') list.push({id:'gemini',name:'Antigravity',glyph:'Ag',snap:agSnap});
   list.push({id:'deepseek',name:'DeepSeek',glyph:'Ds',snap:{...deepseekSnap,windows:[]}});
-  return list;
+  return list.filter(p=>p.snap.status!=='disabled');
 }
 function headlineOf(snap){
   if(!snap.windows.length) return null;
@@ -186,6 +190,9 @@ function renderRing(){
       <div class="pct">—</div></div>`).join('');
     pill.dataset.cells=want;
   }
+  const gear=document.getElementById('connections');
+  gear.style.bottom='auto';
+  gear.style.top=Math.min(window.innerHeight-42, pill.getBoundingClientRect().bottom+12)+'px';
   for(const p of ps){
     const cell=pill.querySelector(`.cell[data-p="${p.id}"]`); if(!cell) continue;
     const svg=cell.querySelector('svg.ring'), pct=cell.querySelector('.pct'), glyph=cell.querySelector('.glyph'), wrap=cell.querySelector('.ringwrap');

@@ -3,6 +3,8 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
+    #[serde(default)]
+    pub disabled_providers: Vec<String>,
     #[serde(default = "default_port")]
     pub port: u16,
     /// "auto" | "zh" | "en" | "ja" | "ko"
@@ -37,6 +39,7 @@ fn default_lang() -> String {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            disabled_providers: Vec::new(),
             port: default_port(),
             lang: default_lang(),
             bar_x: None,

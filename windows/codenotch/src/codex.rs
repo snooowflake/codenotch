@@ -363,6 +363,7 @@ pub fn present() -> bool {
 }
 
 fn read_once() -> UsageSnapshot {
+    if !crate::accounts::enabled("codex") { return crate::accounts::hidden(); }
     let mut snap = UsageSnapshot::default();
     // Note attached to the fallback reading when the live read failed; needs_auth picks the empty state when there is no fallback either
     let mut live_note: Option<String> = None;
@@ -459,9 +460,14 @@ fn cap(s: &str) -> String {
     }
 }
 
-fn broadcast(app: &AppHandle, snap: UsageSnapshot) {
+fn broadcast(app: &AppHandle, mut snap: UsageSnapshot) {
     let st = app.state::<AppState>();
-    *st.codex.lock().unwrap() = snap.clone();
+    let mut current = st.codex.lock().unwrap();
+    if !crate::accounts::enabled("codex") {
+        let hold = snap.backoff_until.max(current.backoff_until);
+        snap = crate::accounts::hidden(); snap.backoff_until = hold;
+    }
+    *current = snap.clone();
     persist(&snap);
     let _ = app.emit("codex", &snap);
 }

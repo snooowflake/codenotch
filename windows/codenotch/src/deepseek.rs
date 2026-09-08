@@ -22,27 +22,10 @@ pub struct Amount {
     pub topped_up: String,
 }
 
-#[cfg(windows)]
-fn read_key() -> Option<String> {
-    use windows::core::PCWSTR;
-    use windows::Win32::Security::Credentials::{CredFree, CredReadW, CREDENTIALW, CRED_TYPE_GENERIC};
-    let target: Vec<u16> = "codenotch:deepseek".encode_utf16().chain(Some(0)).collect();
-    let mut ptr: *mut CREDENTIALW = std::ptr::null_mut();
-    unsafe {
-        if CredReadW(PCWSTR(target.as_ptr()), CRED_TYPE_GENERIC, 0, &mut ptr).is_err() || ptr.is_null() {
-            return None;
-        }
-        let c = &*ptr;
-        let key = if !c.CredentialBlob.is_null() && (1..=4096).contains(&c.CredentialBlobSize) {
-            String::from_utf8(std::slice::from_raw_parts(c.CredentialBlob, c.CredentialBlobSize as usize).to_vec()).ok()
-        } else { None };
-        CredFree(ptr as *const core::ffi::c_void);
-        key.filter(|k| k.starts_with("sk-") && k.len() <= 512 && k.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'))
-    }
-}
-#[cfg(not(windows))]
-fn read_key() -> Option<String> { None }
-
+static REFRESH: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+pub fn request_refresh() { REFRESH.store(true, std::sync::atomic::Ordering::SeqCst); }
+pub fn credentials_changed() { GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst); request_refresh(); }
 
 fn amount(v: &serde_json::Value, field: &str) -> Result<String, &'static str> {
     let s = v.get(field).and_then(|x| x.as_str()).ok_or("Invalid balance response")?;
@@ -65,8 +48,17 @@ fn parse(v: &serde_json::Value) -> Result<Vec<Amount>, &'static str> {
 pub fn start(app: AppHandle) {
     std::thread::spawn(move || {
         let mut last = Balance::default();
+        let mut seen_generation = 0;
+        let mut retry_at = std::time::Instant::now();
         loop {
-            if let Some(key) = read_key() {
+            let generation = GENERATION.load(std::sync::atomic::Ordering::SeqCst);
+            if generation != seen_generation { last = Balance::default(); seen_generation = generation; }
+            if !crate::accounts::enabled("deepseek") {
+                last = Balance { status: "disabled".into(), ..Default::default() };
+            } else if std::time::Instant::now() < retry_at {
+                last.status = "backoff".into();
+                last.note = "DeepSeek rate limit; next attempt in five minutes".into();
+            } else if let Some(key) = crate::vault::read() {
                 let response = ureq::AgentBuilder::new().redirects(0).timeout(Duration::from_secs(15)).build()
                     .get(ENDPOINT).set("Authorization", &format!("Bearer {key}"))
                     .set("Accept", "application/json").call();
@@ -80,20 +72,32 @@ pub fn start(app: AppHandle) {
                             .and_then(|v| parse(&v))
                     },
                     Err(ureq::Error::Status(401 | 403, _)) => Err("DeepSeek API key refused; update it locally"),
-                    Err(ureq::Error::Status(429, _)) => Err("DeepSeek rate limit; next attempt in five minutes"),
+                    Err(ureq::Error::Status(429, _)) => { retry_at = std::time::Instant::now() + Duration::from_secs(300); Err("DeepSeek rate limit; next attempt in five minutes") },
                     _ => Err("DeepSeek balance unavailable"),
                 };
+                if GENERATION.load(std::sync::atomic::Ordering::SeqCst) != generation { continue; }
                 match result {
                     Ok(balances) => last = Balance { status: "ok".into(), note: String::new(), fetched_at: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64, balances },
                     Err(note) => { last.status = if last.balances.is_empty() { "error" } else { "stale" }.into(); last.note = note.into(); }
                 }
             } else {
-                last = Balance { status: "needsAuth".into(), note: "Configure the API key locally with Setup-DeepSeek.ps1".into(), ..Default::default() };
+                last = Balance { status: "needsAuth".into(), note: "Ouvrez Connexions pour enregistrer votre clé API DeepSeek".into(), ..Default::default() };
             }
-            *app.state::<crate::AppState>().deepseek.lock().unwrap() = last.clone();
-            let _ = app.emit("deepseek", &last);
-            // Keep a full five-minute minimum between API calls, including failures.
-            for _ in 0..300 { std::thread::sleep(Duration::from_secs(1)); }
+            {
+                let st = app.state::<crate::AppState>();
+                let mut current = st.deepseek.lock().unwrap();
+                if GENERATION.load(std::sync::atomic::Ordering::SeqCst) != generation { continue; }
+                if !crate::accounts::enabled("deepseek") { last = Balance { status: "disabled".into(), ..Default::default() }; }
+                *current = last.clone();
+                let _ = app.emit("deepseek", &last);
+            }
+            // Automatic polling is five minutes; manual refresh waits at least 15 seconds.
+            for elapsed in 0..300 {
+                std::thread::sleep(Duration::from_secs(1));
+                if GENERATION.load(std::sync::atomic::Ordering::SeqCst) != generation { break; }
+                // A rate-limit response keeps the full five-minute pause.
+                if elapsed >= 14 && !last.note.contains("rate limit") && REFRESH.swap(false, std::sync::atomic::Ordering::SeqCst) { break; }
+            }
         }
     });
 }

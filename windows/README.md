@@ -1,65 +1,46 @@
-# Codenotch for Windows
+# Codenotch Windows 0.4.0
 
-A Windows port of [Codenotch](https://github.com/vinzdg/codenotch) — the usage notch that
-sits on the edge of your screen and answers two questions at a glance:
-**how much of my AI allowance is left**, and **is Claude still working**.
+Un panneau au bord de l’écran pour suivre vos quotas et votre solde API DeepSeek. Le menu **⚙ Connexions** est accessible sur le panneau et depuis l’icône de notification Windows.
 
-Same design language as the macOS original (inverse-rounded pill, colour-graded rings,
-hover card with per-window bars), rebuilt for Windows in Rust + Tauri 2 / WebView2.
-No code is copied from the Swift app; the providers are reimplemented from their
-documented behaviour and the wire formats.
+## Installation
 
-## What it shows
+1. Téléchargez l’archive Windows x64 depuis les [Releases du fork](https://github.com/snooowflake/codenotch/releases).
+2. Extrayez les fichiers dans un dossier personnel et lancez `codenotch.exe`.
+3. Cliquez sur **⚙**, activez les services souhaités et suivez les indications.
 
-| Cell | Source | How it reads it |
+Windows 10/11 x64 et Microsoft Edge WebView2 Runtime sont nécessaires. Le binaire portable n’est pas signé : Windows peut afficher un avertissement d’éditeur inconnu. Comparez `Get-FileHash .\codenotch.exe -Algorithm SHA256` au fichier `SHA256SUMS.txt`.
+
+Pour une mise à jour, quittez Codenotch depuis son icône de notification avant de remplacer les fichiers. Réglages et clé enregistrée sont conservés. Le démarrage avec Windows est optionnel, désactivé par défaut.
+
+## Connexions
+
+| Service | Connexion | Affichage |
 |---|---|---|
-| **Claude** | `GET https://api.anthropic.com/api/oauth/usage` with the token Claude Code keeps in `~/.claude/.credentials.json` | Session / weekly windows, 429 back-off with a persisted deadline, stale readings dimmed with their age. A thin arc spins inside the ring while a Claude session is working, and pulses amber when one is waiting on you (Claude Code hooks + transcript watcher, desktop app included). |
-| **Codex** | `GET https://chatgpt.com/backend-api/wham/usage` with the session Codex keeps in `~/.codex/auth.json` (read only, never refreshed), falling back to the `rate_limits` snapshot in the newest rollout log | Live primary/secondary windows (5h + weekly on paid plans, a monthly window on free) while Codex is signed in; otherwise the last snapshot, marked stale by its own timestamp. |
-| **Cursor** | The editor's own session from `state.vscdb` → `cursor.com/api/usage-summary` | Included usage / API usage / on-demand, reset at billing-cycle end. Nothing to sign into: it borrows the editor's session, so there is only ever one account. |
-| **Antigravity** | The local `language_server` bridge (quota summary), then Google's Cloud Code API for licensed accounts, then a plain count of today's model turns | Honest degradation: a percentage only when one exists, a `~count` when it does not. |
+| GPT / Codex | Session ChatGPT de Codex sur ce PC (`codex login` ou application Codex) | Quotas ; dernier relevé local en secours |
+| Claude Code | `/login` dans Claude Code | Quotas de session et de semaine |
+| Cursor | Connexion dans l’éditeur Cursor | Utilisation du compte de l’éditeur |
+| Antigravity | Application ouverte avec votre compte Google connecté | Quotas disponibles, ou compteur de tours indiqué comme tel |
+| DeepSeek API | Clé `sk-…` dans **Connexions → DeepSeek API** | Solde officiel USD/CNY |
 
-Providers that are not installed simply do not get a cell.
+Le menu permet d’activer/désactiver chaque service, d’actualiser, d’ouvrir les pages officielles et d’enregistrer/remplacer/supprimer la clé DeepSeek. Les autres lecteurs utilisent les sessions locales : saisissez les codes de connexion dans leurs parcours officiels. Une clé API OpenAI, Anthropic ou Gemini ne remplace pas une session d’abonnement pour ces lecteurs.
 
-## Install / build
+Les clés déjà enregistrées par `Setup-DeepSeek.ps1` sont reconnues. Ce script reste disponible en secours. **Activer un lecteur ne connecte pas un compte absent.** Une session expirée ou une API modifiée peut empêcher un relevé ; son état ou son âge sont indiqués.
 
-Prerequisites: Rust (MSVC toolchain), WebView2 runtime (ships with Windows 11).
+## Données et compilation
+
+La clé DeepSeek est conservée dans le coffre Windows sous `codenotch:deepseek`, jamais renvoyée au formulaire. Les réglages et relevés résident dans `%APPDATA%\codenotch`. Les collecteurs d’activité et le serveur de hooks sont désactivés. Voir [SECURITY.md](SECURITY.md).
+
+Prérequis de compilation : Rust stable MSVC, Visual C++ Build Tools avec SDK Windows, WebView2.
 
 ```powershell
-# from this directory (the repo root here; `windows/` inside the upstream repo)
-cargo build --release
-.\target\release\codenotch.exe          # pill appears on the right edge of the primary monitor
-.\target\release\codenotch.exe doctor   # self-diagnosis: credentials, data sources, icons, hooks
+cd windows
+cargo test --locked --release -p codenotch
+cargo build --locked --release -p codenotch
+.\target\release\codenotch.exe
 ```
 
-Tray menu: refresh now, reset position, open data folder (`%APPDATA%\codenotch` — logs,
-persisted readings, icon overrides), start with Windows, install/uninstall Claude Code hooks.
+Le workflow `Windows portable build` teste et compile avec les dépendances verrouillées. Le paquet contient la révision source, les empreintes et l’arbre des dépendances Windows. Aucune clé personnelle n’est nécessaire à la compilation.
 
-### Icons
+## Crédits
 
-Provider marks are the SVGs from [`@lobehub/icons-static-svg`](https://github.com/lobehub/lobe-icons)
-(MIT), embedded unmodified — see `codenotch/glyphs/NOTICE.md`. Drop your own
-`claude|codex|cursor|gemini.svg` (or `.png`) into `%APPDATA%\codenotch\glyphs\` to override.
-The marks remain the trademarks of their owners.
-
-## Layout
-
-```
-.
-├── codenotch/          Tauri 2 app: window, tray, providers (usage.rs, codex.rs, cursor.rs, antigravity.rs),
-│   ├── src/            session engine (watcher.rs, state.rs, focus.rs), glyphs.rs, doctor.rs
-│   ├── ui/notch.html   the pill + hover card (single file, no framework)
-│   └── glyphs/         provider marks (+ NOTICE.md)
-└── codenotch-hook/     <5 ms hook messenger Claude Code calls; forwards events to the app
-```
-
-## Relationship to upstream
-
-This port follows the upstream design spec (`docs/specs/2026-08-28-usage-notch-design.md`)
-and provider semantics. It is developed at
-[Im-Midi/codenotch-windows](https://github.com/Im-Midi/codenotch-windows) and offered to the
-upstream project as its `windows/` tree; the two are kept in sync. The session-detection engine
-originated in [Im-Midi/Pac-Man](https://github.com/Im-Midi/Pac-Man) (MIT).
-
-## License
-
-MIT — see `LICENSE`. The Codenotch design and name belong to the upstream author.
+Fork de [vinzdg/codenotch](https://github.com/vinzdg/codenotch), port Windows issu de [Im-Midi/codenotch-windows](https://github.com/Im-Midi/codenotch-windows). Licence MIT : `LICENSE` à la racine. Icônes et marques : `codenotch/glyphs/NOTICE.md`.

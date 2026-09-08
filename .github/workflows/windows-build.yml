@@ -29,7 +29,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           rustup default stable-x86_64-pc-windows-msvc
       - name: Test
-        run: cargo test --locked -p codenotch
+        run: cargo test --locked --release -p codenotch
       - name: Build release
         run: cargo build --locked --release -p codenotch
       - name: Package portable executable
@@ -37,7 +37,7 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item target/release/codenotch.exe dist/
           Copy-Item ../LICENSE,README.md dist/
-          Copy-Item Setup-DeepSeek.ps1 dist/
+          Copy-Item Setup-DeepSeek.ps1,SECURITY.md dist/
           git rev-parse HEAD | Set-Content dist/SOURCE-COMMIT.txt
           cargo tree --locked -p codenotch --target x86_64-pc-windows-msvc | Set-Content dist/DEPENDENCIES.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
