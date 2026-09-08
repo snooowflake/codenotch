@@ -94,6 +94,7 @@ fn handle(app: &AppHandle, id: &str) {
         }
         "refresh" => {
             crate::deepseek::request_refresh();
+            crate::grok::request_refresh();
             crate::usage::request_refresh();
             crate::codex::request_refresh();
             crate::cursor::request_refresh();

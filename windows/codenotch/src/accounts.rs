@@ -2,13 +2,13 @@
 use std::sync::atomic::{AtomicU8, Ordering};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
-const IDS: [&str; 5] = ["claude", "codex", "cursor", "gemini", "deepseek"];
-static ENABLED: AtomicU8 = AtomicU8::new(31);
+const IDS: [&str; 6] = ["claude", "codex", "cursor", "gemini", "deepseek", "grok"];
+static ENABLED: AtomicU8 = AtomicU8::new(63);
 
 fn bit(id: &str) -> u8 { IDS.iter().position(|p| *p == id).map(|i| 1 << i).unwrap_or(0) }
 pub fn enabled(id: &str) -> bool { ENABLED.load(Ordering::SeqCst) & bit(id) != 0 }
 pub fn initialize(disabled: &[String]) {
-    ENABLED.store(disabled.iter().fold(31, |mask, id| mask & !bit(id)), Ordering::SeqCst);
+    ENABLED.store(disabled.iter().fold(63, |mask, id| mask & !bit(id)), Ordering::SeqCst);
 }
 pub fn hidden() -> crate::usage::UsageSnapshot {
     crate::usage::UsageSnapshot { status: "disabled".into(), ..Default::default() }
@@ -32,9 +32,10 @@ pub fn get_accounts(app: AppHandle) -> Vec<Account> {
             "codex" => st.codex.lock().unwrap().status.clone(),
             "cursor" => st.cursor.lock().unwrap().status.clone(),
             "gemini" => st.antigravity.lock().unwrap().status.clone(),
+            "grok" => st.grok.lock().unwrap().status.clone(),
             _ => st.deepseek.lock().unwrap().status.clone(),
         };
-        Account { id, enabled: enabled(id), status, key_saved: id == "deepseek" && crate::vault::exists() }
+        Account { id, enabled: enabled(id), status, key_saved: (id == "deepseek" && crate::vault::exists()) || (id == "grok" && crate::grok_vault::exists()) }
     }).collect()
 }
 pub fn wake() {
@@ -43,6 +44,7 @@ pub fn wake() {
     crate::cursor::request_refresh();
     crate::antigravity::request_refresh();
     crate::deepseek::request_refresh();
+    crate::grok::request_refresh();
 }
 #[tauri::command]
 pub fn set_provider_enabled(window: WebviewWindow, app: AppHandle, provider: String, on: bool) -> Result<(), String> {
@@ -67,6 +69,7 @@ pub fn set_provider_enabled(window: WebviewWindow, app: AppHandle, provider: Str
             "codex" => (Some(&st.codex), "codex", "codex.json"),
             "cursor" => (Some(&st.cursor), "cursor", "cursor.json"),
             "gemini" => (Some(&st.antigravity), "antigravity", "antigravity.json"),
+            "grok" => (None, "grok", ""),
             _ => (None, "deepseek", ""),
         };
         if let Some(slot) = slot {
@@ -79,9 +82,9 @@ pub fn set_provider_enabled(window: WebviewWindow, app: AppHandle, provider: Str
             let _ = app.emit(event, &empty);
         } else {
             let empty = crate::deepseek::Balance { status: "disabled".into(), ..Default::default() };
-            let mut current = st.deepseek.lock().unwrap();
+            let mut current = if provider == "grok" { st.grok.lock().unwrap() } else { st.deepseek.lock().unwrap() };
             *current = empty.clone();
-            let _ = app.emit("deepseek", &empty);
+            let _ = app.emit(event, &empty);
         }
     }
     wake();
@@ -129,12 +132,37 @@ pub fn forget_deepseek_key(window: WebviewWindow, app: AppHandle) -> Result<(), 
     let _ = app.emit("accounts-changed", ());
     Ok(())
 }
+#[tauri::command]
+pub fn save_grok_key(window: WebviewWindow, app: AppHandle, team: String, mut key: String) -> Result<(), String> {
+    settings_only(&window)?;
+    let mut packed = format!("{}\n{}", team.trim(), key.trim());
+    unsafe { key.as_bytes_mut().fill(0); }
+    let result = crate::grok_vault::save(&packed);
+    unsafe { packed.as_bytes_mut().fill(0); }
+    result?;
+    crate::grok::credentials_changed();
+    let _ = app.emit("accounts-changed", ());
+    Ok(())
+}
+#[tauri::command]
+pub fn forget_grok_key(window: WebviewWindow, app: AppHandle) -> Result<(), String> {
+    settings_only(&window)?;
+    crate::grok_vault::delete()?;
+    crate::grok::credentials_changed();
+    let st = app.state::<crate::AppState>();
+    let mut current = st.grok.lock().unwrap();
+    *current = crate::grok::Balance::default();
+    let _ = app.emit("grok", crate::grok::Balance::default());
+    let _ = app.emit("accounts-changed", ());
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
     fn provider_identifiers_are_allowlisted() {
         assert_eq!(bit("deepseek"), 16);
+        assert_eq!(bit("grok"), 32);
         assert_eq!(bit("../auth.json"), 0);
         assert_eq!(bit("unknown"), 0);
     }

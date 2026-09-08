@@ -31,3 +31,9 @@ Les secrets existent temporairement en mémoire pendant leur utilisation. Le cof
 La revue du verrou Cargo a signalé `glib 0.18.5`, attendu uniquement pour d’autres plateformes. Le workflow échoue s’il apparaît dans l’arbre Windows. Des dépendances transitives anciennes ou non maintenues subsistent, notamment `proc-macro-error` et des bibliothèques `unic`. Ce contrôle ne remplace pas un audit complet des dépendances ou du binaire.
 
 Les tests vérifient les formats de solde DeepSeek, le rejet d’injection dans une clé et les identifiants de fournisseurs. Aucun constat de vol d’identifiants dans le code examiné ; cela ne garantit pas qu’aucun risque ne subsiste.
+
+## Ajout Grok / xAI (0.5.0)
+
+La clé Management et le Team ID restent dans l’entrée dédiée `codenotch:grok`. Le Team ID est limité aux caractères alphanumériques, tiret et soulignement avant de former le chemin. Les caractères de contrôle sont refusés dans la clé. La seule requête est `GET https://management-api.x.ai/v1/billing/teams/{team_id}/prepaid/balance`, sans redirection, avec délai et taille de réponse limités. Aucune action de paiement ou de gestion de compte n’est exposée.
+
+Le code ne renvoie que le crédit comptabilisé, la date et un état générique ; ni clé, ni Team ID, ni historique de facturation brut dans l’interface ou les journaux. Les erreurs de format sont traitées comme des erreurs, jamais comme un solde nul. Les tests vérifient le signe du registre, les centimes exacts et le rejet des injections dans la clé, le chemin et le montant. Les limites générales de la revue restent applicables.

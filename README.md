@@ -1,6 +1,6 @@
 # Codenotch Windows — Connexions
 
-Ce fork ajoute un panneau **⚙ Connexions** : Codex, Claude Code, Cursor, Antigravity et solde API DeepSeek. Activez les services individuellement ; la clé DeepSeek est conservée dans le coffre Windows.
+Ce fork ajoute un panneau **⚙ Connexions** : Codex, Claude Code, Cursor, Antigravity et crédits API DeepSeek/Grok. Activez les services individuellement ; les clés DeepSeek et Grok sont conservées dans le coffre Windows.
 
 **[Installation et utilisation Windows](windows/README.md)** · **[Téléchargements](https://github.com/snooowflake/codenotch/releases)** · **[Sécurité et limites](windows/SECURITY.md)**
 

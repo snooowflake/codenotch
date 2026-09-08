@@ -35,6 +35,9 @@
     bottom:calc(-1 * var(--fillet));
     background:radial-gradient(circle at 0 100%, transparent calc(var(--fillet) - 1.5px), #2e2e2e calc(var(--fillet) - 0.5px), #000 calc(var(--fillet) + 0.5px));
   }
+  #pill.compact{gap:6px;padding:12px 0}
+  #pill.compact .cell{gap:4px}
+  #pill.compact .ringwrap{width:50px;height:50px}
   .cell{display:flex;flex-direction:column;align-items:center;gap:6px}
   .ringwrap{position:relative;width:56px;height:56px}
   .ringwrap > svg.ring{position:absolute;inset:0;overflow:visible} /* pins only the ring itself; an inline logo svg must not match this or it ends up in the top-left corner */
@@ -121,6 +124,7 @@ let usage={status:'absent',windows:[],fetched_at:0,note:''};
 let codexSnap={status:'absent',windows:[],fetched_at:0,note:''};
 let cursorSnap={status:'absent',windows:[],fetched_at:0,note:''};
 let agSnap={status:'absent',windows:[],fetched_at:0,note:''};
+let grokSnap={status:'needsAuth',note:'Ouvrez Connexions pour renseigner la clé Management xAI et l’équipe.',fetched_at:0,balances:[]};
 let deepseekSnap={status:'needsAuth',note:'Ouvrez Connexions pour enregistrer votre clé API DeepSeek',fetched_at:0,balances:[]};
 let glyphs={}; // id → {kind:'mark'|'appicon', url}
 let activity=[]; // working state of the non-Claude providers: {provider,state:'busy'|'waiting',name,detail,since}
@@ -152,6 +156,7 @@ function providers(){
   if(cursorSnap.status!=='absent') list.push({id:'cursor',name:'Cursor',glyph:'Cu',snap:cursorSnap});
   if(agSnap.status!=='absent') list.push({id:'gemini',name:'Antigravity',glyph:'Ag',snap:agSnap});
   list.push({id:'deepseek',name:'DeepSeek',glyph:'Ds',snap:{...deepseekSnap,windows:[]}});
+  list.push({id:'grok',name:'Grok API',glyph:'Gk',snap:{...grokSnap,windows:[]}});
   return list.filter(p=>p.snap.status!=='disabled');
 }
 function headlineOf(snap){
@@ -182,6 +187,7 @@ function isStale(){
 
 function renderRing(){
   const ps=providers();
+  pill.classList.toggle('compact',ps.length>5);
   // Rebuild the DOM only when the structure changes (never swap the element under the cursor)
   const want=ps.map(p=>p.id+':'+(glyphs[p.id]?glyphs[p.id].kind:'-')).join(',');
   if(pill.dataset.cells!==want){
@@ -205,7 +211,7 @@ function renderRing(){
       else if(ws==='attention') inner+=`<g class="arc-pulse"><circle cx="28" cy="28" r="19" fill="none" stroke="${AMBER}" stroke-width="2.5"/></g>`;
     }
     svg.innerHTML=inner;
-    if(p.id==='deepseek') pct.textContent=deepseekSnap.balances.length?deepseekSnap.balances[0].total:'—';
+    if(p.id==='deepseek'||p.id==='grok') pct.textContent=p.snap.balances.length?p.snap.balances[0].total:'—';
     else if(p.snap.status==='needsAuth'||p.snap.status==='none') pct.textContent='—';
     else if(h && h.count!=null) pct.textContent='~'+h.count;
     else if(h) pct.textContent=(h.derived?'~':'')+Math.round(h.used*100)+'%';
@@ -239,6 +245,13 @@ function renderCard(){
   const p=providers().find(x=>x.id===hoverId)||providers()[0];
   if(!p) return;
   const snap=p.snap;
+  if(p.id==='grok') {
+    let html='<div class="c-head"><span class="c-title">Grok — crédits API</span></div>';
+    for(const b of grokSnap.balances) html+='<div class="win"><div class="w-used">'+esc(b.total)+' USD</div><div class="c-sub">Crédits prépayés comptabilisés</div></div>';
+    if(grokSnap.fetched_at) html+='<div class="c-sub">Updated '+ago(grokSnap.fetched_at)+'</div>';
+    if(grokSnap.note) html+='<div class="c-note">'+esc(grokSnap.note)+'</div>';
+    c.innerHTML=html;placeCard();return;
+  }
   if(p.id==='deepseek') {
     let balanceHtml='<div class="c-head"><span class="c-title">DeepSeek — solde API</span></div>';
     for(const b of deepseekSnap.balances) balanceHtml+='<div class="win"><div class="w-used">'+esc(b.total)+' '+esc(b.currency)+'</div><div class="c-sub">Crédit offert : '+esc(b.granted)+' · Rechargé : '+esc(b.topped_up)+'</div></div>';
@@ -414,6 +427,8 @@ listen('glyphs',e=>{glyphs=e.payload||glyphs;renderRing();if(card.classList.cont
 listen('activity',e=>{activity=e.payload||activity;renderRing();if(card.classList.contains('show'))renderCard();}).catch(()=>{});
 invoke('get_activity').then(a=>{activity=a||activity;renderRing();}).catch(()=>{});
 invoke('get_glyphs').then(g=>{glyphs=g||glyphs;renderRing();}).catch(()=>{});
+listen('grok',e=>{grokSnap=e.payload||grokSnap;renderRing();if(card.classList.contains('show'))renderCard();}).catch(()=>{});
+invoke('get_grok').then(d=>{if(d&&d.status)grokSnap=d;renderRing();}).catch(()=>{});
 listen('deepseek',e=>{deepseekSnap=e.payload||deepseekSnap;renderRing();if(card.classList.contains('show'))renderCard();}).catch(()=>{});
 invoke('get_deepseek').then(d=>{if(d&&d.status)deepseekSnap=d;renderRing();}).catch(()=>{});
 invoke('get_codex').then(u=>{codexSnap=u||codexSnap;renderRing();}).catch(()=>{});

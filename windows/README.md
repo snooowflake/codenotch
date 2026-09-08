@@ -1,4 +1,4 @@
-# Codenotch Windows 0.4.0
+# Codenotch Windows 0.5.0
 
 Un panneau au bord de l’écran pour suivre vos quotas et votre solde API DeepSeek. Le menu **⚙ Connexions** est accessible sur le panneau et depuis l’icône de notification Windows.
 
@@ -44,3 +44,11 @@ Le workflow `Windows portable build` teste et compile avec les dépendances verr
 ## Crédits
 
 Fork de [vinzdg/codenotch](https://github.com/vinzdg/codenotch), port Windows issu de [Im-Midi/codenotch-windows](https://github.com/Im-Midi/codenotch-windows). Licence MIT : `LICENSE` à la racine. Icônes et marques : `codenotch/glyphs/NOTICE.md`.
+
+## Grok / xAI API (0.5.0)
+
+Dans **⚙ Connexions → Grok / xAI API**, saisissez le **Team ID** et une **clé Management xAI** ayant les droits de lecture de facturation. Ces deux valeurs sont conservées ensemble dans le coffre Windows (`codenotch:grok`) ; aucune clé n’est renvoyée à l’interface. La console xAI permet de retrouver le Team ID dans les réglages de l’équipe et de gérer les clés dans Settings → Management Keys.
+
+Le panneau affiche les **crédits prépayés comptabilisés en USD**, via un unique GET de lecture. Les dépenses récentes peuvent ne pas encore être déduites de ce relevé comptable. Ce lecteur n’affiche pas les quotas de l’abonnement SuperGrok et une clé API d’inférence classique ne suffit pas. Aucun appel de chat, rechargement ni changement de facturation n’est effectué.
+
+Sources : [guide Management xAI](https://docs.x.ai/developers/management-api-guide), [référence de facturation](https://docs.x.ai/developers/rest-api-reference/management/billing). Le signe du registre est inversé pour l’affichage des crédits : une recharge de 10 USD est représentée par `-1000` centimes dans la réponse officielle.

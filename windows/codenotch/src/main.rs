@@ -16,6 +16,8 @@ mod antigravity;
 mod glyphs;
 mod activity;
 mod deepseek;
+mod grok;
+mod grok_vault;
 mod accounts;
 mod vault;
 mod watcher;
@@ -26,10 +28,11 @@ use tauri::{AppHandle, Emitter, Manager};
 /// Logical size of the notch window: the 70 pt pill column on the right plus room for the hover card on the left.
 pub const NOTCH_W: f64 = 340.0;
 /// Hand-bumped build tag, written to run.log at startup so a log can always be matched to the exe that wrote it.
-pub const BUILD: &str = "connections-0.4.0";
+pub const BUILD: &str = "connections-0.5.0";
 pub const NOTCH_H: f64 = 620.0; // 300 clipped the card once it held three window blocks plus the session list
 
 pub struct AppState {
+    pub grok: Mutex<grok::Balance>,
     pub deepseek: Mutex<deepseek::Balance>,
     pub store: Mutex<state::Store>,
     pub cfg: Mutex<config::Config>,
@@ -255,6 +258,7 @@ fn get_usage(state: tauri::State<AppState>) -> usage::UsageSnapshot {
 #[tauri::command]
 fn refresh_usage(app: AppHandle) {
     deepseek::request_refresh();
+    grok::request_refresh();
     usage::request_refresh();
     codex::request_refresh();
     cursor::request_refresh();
@@ -314,6 +318,7 @@ fn open_provider_page(provider: String) {
     let url = match provider.as_str() {
         "codex" => "https://chatgpt.com/#settings/Account",
         "deepseek" => "https://platform.deepseek.com/usage",
+        "grok" => "https://console.x.ai/",
         "cursor" => "https://cursor.com/dashboard",
         "gemini" => "https://antigravity.google",
         _ => "https://claude.ai/settings/usage",
@@ -555,6 +560,9 @@ fn get_deepseek(state: tauri::State<AppState>) -> deepseek::Balance {
     state.deepseek.lock().unwrap().clone()
 }
 
+#[tauri::command]
+fn get_grok(state: tauri::State<AppState>) -> grok::Balance { state.grok.lock().unwrap().clone() }
+
 fn main() {
     attach_console();
     let args: Vec<String> = std::env::args().collect();
@@ -609,6 +617,7 @@ fn main() {
             let _ = app.emit("notice", format!("Codenotch is already running ({BUILD}) — quit it from the tray before starting a new build"));
         }))
         .manage(AppState {
+            grok: Mutex::new(grok::Balance::default()),
             deepseek: Mutex::new(deepseek::Balance::default()),
             store: Mutex::new(Default::default()),
             cfg: Mutex::new(cfg),
@@ -628,6 +637,9 @@ fn main() {
             accounts::save_deepseek_key,
             accounts::forget_deepseek_key,
             get_deepseek,
+            get_grok,
+            accounts::save_grok_key,
+            accounts::forget_grok_key,
             get_state,
             get_usage,
             get_codex,
@@ -660,6 +672,7 @@ fn main() {
             antigravity::start(handle.clone());
             codex::start(handle.clone());
             deepseek::start(handle.clone());
+            grok::start(handle.clone());
             // Collecting glyphs may read icon resources out of a few executables; do it off the main thread and push when done
             let gh = handle.clone();
             std::thread::spawn(move || reload_glyphs(&gh));

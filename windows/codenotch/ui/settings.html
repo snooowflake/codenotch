@@ -13,7 +13,7 @@ main{padding:18px 24px 26px}article{border:1px solid #343a43;border-radius:14px;
 .help{font-size:12px;color:#aeb6c3;line-height:1.6}code{display:inline-block;background:#101216;color:#d2dfec;padding:1px 6px;border-radius:4px;user-select:text}
 button{border:1px solid #4c5665;border-radius:8px;background:#262d37;color:#edf2f8;padding:8px 12px;font:inherit;cursor:pointer}button:hover{background:#354153}button:disabled{opacity:.5;cursor:wait}button:focus-visible,input:focus-visible{outline:2px solid #7de3b3;outline-offset:2px}
 .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.primary{background:#75dbae;color:#102319;border-color:#75dbae;font-weight:600}.primary:hover{background:#98efc7}.danger{color:#ffc1b3}.field{display:block;margin-top:12px;font-size:12px}
-input[type=password]{width:100%;margin-top:5px;border:1px solid #536073;background:#101419;color:#f4f7fa;border-radius:8px;padding:10px;font:15px "Segoe UI",sans-serif}
+input[type=password],input[type=text]{width:100%;margin-top:5px;border:1px solid #536073;background:#101419;color:#f4f7fa;border-radius:8px;padding:10px;font:15px "Segoe UI",sans-serif}
 #feedback{min-height:24px;color:#9be5c1;font-size:13px;margin-bottom:10px;overflow-wrap:anywhere}
 footer{font-size:12px;color:#929daa;padding-top:8px}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}.toolbar span{color:#aeb6c3;font-size:12px}
 .stored{font-size:12px;color:#a6bfaf;margin-top:5px}details{margin-top:9px;font-size:12px;color:#b3bdc9}summary{cursor:pointer}details p{margin-top:8px}
@@ -55,11 +55,27 @@ footer{font-size:12px;color:#929daa;padding-top:8px}.toolbar{display:flex;justif
   <div class="actions"><button class="primary" id="save-key" type="submit">Enregistrer la clé</button><button class="danger" id="forget-key" type="button">Oublier la clé</button><button data-page="deepseek" type="button">Page du compte</button></div>
  </form>
 </article>
-<footer>Désactiver un service arrête ses lectures et masque ses données. Cela ne déconnecte pas l’application d’origine. Vos clés ne sont ni incluses dans le code partagé ni envoyées à GitHub.</footer>
+<article data-provider="grok">
+ <div class="row"><span class="mark">Gk</span><h2>Grok / xAI API</h2><label class="switch"><input type="checkbox" data-toggle="grok" aria-label="Activer Grok">Activé</label></div>
+ <div class="state" data-status="grok">Vérification…</div>
+ <p class="help">Affiche les crédits prépayés comptabilisés de votre équipe xAI. Les dépenses récentes peuvent ne pas encore être déduites. Ce relevé ne concerne pas l’abonnement SuperGrok.</p>
+ <details><summary>Où trouver ces identifiants ?</summary><p>Dans la console xAI : Settings → Management Keys pour la clé, et les réglages de l’équipe pour le Team ID. Choisissez uniquement les droits de lecture de facturation nécessaires. Une clé API de chat classique ne permet pas de lire ce solde.</p></details>
+ <form id="grok-form" autocomplete="off">
+  <label class="field" for="grok-team">Identifiant d’équipe xAI (Team ID)</label>
+  <input type="text" id="grok-team" autocomplete="off" spellcheck="false" maxlength="128" placeholder="Identifiant de votre équipe">
+  <label class="field" for="grok-key">Clé Management xAI</label>
+  <input type="password" id="grok-key" autocomplete="new-password" spellcheck="false" maxlength="2048" placeholder="Clé de gestion avec lecture de facturation">
+  <div id="grok-key-state" class="stored">Aucun accès enregistré.</div>
+  <div class="actions"><button class="primary" id="save-grok" type="submit">Enregistrer Grok</button><button class="danger" id="forget-grok" type="button">Oublier Grok</button><button data-page="grok" type="button">Console xAI</button></div>
+ </form>
+</article>
+<footer>Désactiver un service arrête ses lectures et masque ses données. Cela ne déconnecte pas l’application d’origine. Vos clés sont enregistrées dans le coffre Windows, ni incluses dans le code partagé ni envoyées à GitHub.</footer>
 </main>
 <script>
 const invoke=window.__TAURI__.core.invoke,listen=window.__TAURI__.event.listen;
 const input=document.getElementById('api-key'),feedback=document.getElementById('feedback');
+const grokKey=document.getElementById('grok-key'),grokTeam=document.getElementById('grok-team');
+function clearGrok(){grokKey.value='';grokTeam.value='';}
 let busy=false;
 const labels={ok:'Connecté · dernière lecture reçue',stale:'Dernière lecture conservée · actualisation en attente',needsAuth:'Connexion nécessaire',absent:'Session locale non détectée',none:'En attente de données',error:'Service indisponible · réessayez plus tard',backoff:'Limite temporaire · attente du prochain essai',disabled:'Désactivé'};
 function say(text){feedback.textContent=text;}
@@ -75,6 +91,10 @@ async function load(){
    if(a.id==='deepseek'){
     document.getElementById('key-state').textContent=a.key_saved?'Une clé est enregistrée. Elle ne sera jamais réaffichée.':'Aucune clé enregistrée.';
     document.getElementById('forget-key').disabled=!a.key_saved||busy;
+   }
+   if(a.id==='grok'){
+    document.getElementById('grok-key-state').textContent=a.key_saved?'Accès enregistré dans le coffre Windows. La clé ne sera jamais réaffichée.':'Aucun accès enregistré.';
+    document.getElementById('forget-grok').disabled=!a.key_saved||busy;
    }
   }
  }catch{say('Impossible de lire les connexions. Fermez puis rouvrez ce menu.');}
@@ -105,9 +125,25 @@ document.getElementById('forget-key').addEventListener('click',async()=>{
 });
 document.getElementById('refresh').addEventListener('click',async()=>{try{await invoke('refresh_accounts');say('Actualisation demandée. Les délais imposés par les services restent respectés.');load();}catch{say('Actualisation indisponible.');}});
 listen('accounts-changed',load).catch(()=>{});
-listen('settings-hidden',()=>{input.value='';}).catch(()=>{});
-window.addEventListener('pagehide',()=>{input.value='';});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){input.value='';invoke('close_settings').catch(()=>{});}});
+document.getElementById('grok-form').addEventListener('submit',async event=>{
+ event.preventDefault();if(busy)return;
+ const team=grokTeam.value.trim(),key=grokKey.value.trim();clearGrok();
+ if(!/^[A-Za-z0-9_-]{1,128}$/.test(team)||!/^[A-Za-z0-9_.=-]{8,2048}$/.test(key)){say('Vérifiez le Team ID et la clé Management xAI.');return;}
+ busy=true;document.getElementById('save-grok').disabled=true;
+ try{await invoke('save_grok_key',{team,key});say('Accès Grok enregistré dans le coffre Windows. Lecture des crédits en cours…');}
+ catch{say('Impossible d’enregistrer l’accès Grok dans le coffre Windows.');}
+ finally{busy=false;document.getElementById('save-grok').disabled=false;load();}
+});
+document.getElementById('forget-grok').addEventListener('click',async()=>{
+ if(busy)return;
+ if(!window.confirm('Oublier l’accès Grok sur ce PC ? Votre compte xAI reste inchangé.'))return;
+ clearGrok();busy=true;
+ try{await invoke('forget_grok_key');say('Accès Grok supprimé du coffre Windows.');}catch{say('Impossible de supprimer l’accès Grok.');}
+ finally{busy=false;load();}
+});
+listen('settings-hidden',()=>{input.value='';clearGrok();}).catch(()=>{});
+window.addEventListener('pagehide',()=>{input.value='';clearGrok();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){input.value='';clearGrok();invoke('close_settings').catch(()=>{});}});
 setInterval(load,3000);load();
 </script>
 </body></html>
